@@ -25,11 +25,6 @@ type QueueInfo struct {
 // Alternatively, it can be done through the QueueInfo.SetFormatName() function:
 //   err := queueInfo.SetFormatName(name)
 func NewQueueInfo(opts ...QueueInfoOption) (*QueueInfo, error) {
-	options := &queueInfoOptions{}
-	for _, o := range opts {
-		o.set(options)
-	}
-
 	unknown, err := oleutil.CreateObject("MSMQ.MSMQQueueInfo")
 	if err != nil && err.Error() == "Invalid class string" {
 		return nil, ErrMSMQNotInstalled
@@ -40,28 +35,32 @@ func NewQueueInfo(opts ...QueueInfoOption) (*QueueInfo, error) {
 		return nil, err
 	}
 
-	return &QueueInfo{
+	queueInfo := &QueueInfo{
 		dispatch: dispatch,
-	}, nil
+	}
+
+	for _, o := range opts {
+		err = o.set(queueInfo)
+		if err != nil {
+			return nil, fmt.Errorf("msmq: failed to create new QueueInfo: %w", err)
+		}
+
+	}
+
+	return queueInfo, nil
 }
 
 // QueueInfoOption represents an option to configure QueueInfo.
 type QueueInfoOption struct {
-	set func(opts *queueInfoOptions)
-}
-
-// queueInfoOptions contains all the options to configure QueueInfo.
-type queueInfoOptions struct {
-	formatName string
-	pathName   string
+	set func(qi *QueueInfo) error
 }
 
 // WithFormatName returns a QueueInfoOption that configures QueueInfo with the
 // specified format name.
 func WithFormatName(name string) QueueInfoOption {
 	return QueueInfoOption{
-		set: func(opts *queueInfoOptions) {
-			opts.formatName = name
+		set: func(qi *QueueInfo) error {
+			return qi.SetFormatName(name)
 		},
 	}
 }
@@ -70,8 +69,8 @@ func WithFormatName(name string) QueueInfoOption {
 // specified path name.
 func WithPathName(name string) QueueInfoOption {
 	return QueueInfoOption{
-		set: func(opts *queueInfoOptions) {
-			opts.pathName = name
+		set: func(qi *QueueInfo) error {
+			return qi.SetPathName(name)
 		},
 	}
 }
