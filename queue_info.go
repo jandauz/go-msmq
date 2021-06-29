@@ -225,6 +225,22 @@ func (qi *QueueInfo) Refresh() error {
 	return nil
 }
 
+// Update updates the properties of the queue represented by QueueInfo with
+// its current property values. It can only be called after a queue has been
+// created or before the queue is deleted.
+//
+// Update can only update the properties of a public queue or a local private
+// queue. Additionally, there are some properties that Update cannot update.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms705153(v=vs.85)
+func (qi *QueueInfo) Update() error {
+	_, err := qi.dispatch.CallMethod("Update")
+	if err != nil {
+		return fmt.Errorf("go-msmq: Update() failed to update queue: %w", err)
+	}
+	return nil
+}
+
 // FormatName returns the format name.
 func (qi *QueueInfo) FormatName() (string, error) {
 	res, err := qi.dispatch.GetProperty("FormatName")
