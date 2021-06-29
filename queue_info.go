@@ -79,6 +79,73 @@ func WithPathName(name string) QueueInfoOption {
 // not installed.
 var ErrMSMQNotInstalled = errors.New("msmq: message queuing has not been installed on this computer")
 
+// Create creates a public or private queue based on the options set on QueueInfo.
+//
+// The PathName option must be set on QueueInfo before calling Create.
+//   queueInfo, err := msmq.NewQueueInfo()
+//   if err != nil {
+//	     log.Error(err)
+//   }
+//   err = queueInfo.SetPathName(name)
+//   if err != nil {
+//	     log.Error(err)
+//   }
+//   err = queueInfo.Create()
+//   if err != nil {
+//	     log.Error(err)
+//   }
+func (qi *QueueInfo) Create(opts ...CreateQueueOption) error {
+	options := &createQueueOptions{
+		transactional: false,
+		worldReadable: false,
+	}
+	for _, o := range opts {
+		o.set(options)
+	}
+
+	_, err := qi.dispatch.CallMethod("Create", options.transactional, options.worldReadable)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// CreateQueueOption represents an option to configure the creation of a queue.
+type CreateQueueOption struct {
+	set func(opts *createQueueOptions)
+}
+
+// createQueueOptions contains all the options for creating a queue.
+type createQueueOptions struct {
+	transactional bool
+	worldReadable bool
+}
+
+// CreateQueueWithTransactional returns a CreateQueueOption that configures
+// the queue with the specified transactional value.
+func CreateQueueWithTransactional(transactional bool) CreateQueueOption {
+	return CreateQueueOption{
+		set: func(opts *createQueueOptions) {
+			opts.transactional = transactional
+		},
+	}
+}
+
+// CreateQueueWithWorldReadable returns a CreateQueueOption that configures
+// the queue with the specified worldReadable value.
+func CreateQueueWithWorldReadable(worldReadable bool) CreateQueueOption {
+	return CreateQueueOption{
+		set: func(opts *createQueueOptions) {
+			opts.worldReadable = worldReadable
+		},
+	}
+}
+
+// Open opens a queue for sending, peeking at, retrieving, or purging messages
+// and creates a cursor for navigating the queue if the queue is being opened
+// for retrieving messages.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms707027(v=vs.85)
 func (qi *QueueInfo) Open(accessMode AccessMode, shareMode ShareMode) (*Queue, error) {
 	queue, err := qi.dispatch.CallMethod("Open", int(accessMode), int(shareMode))
 	if err != nil {
