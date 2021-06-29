@@ -209,6 +209,23 @@ const (
 	DenyReceive = 1
 )
 
+// Refresh updates the properties of QueueInfo. For example, if user 1 locates
+// the queue and then user 2 modifies the queue's properties, user 1 needs to
+// call QueueInfo.Refresh() to sync up with user 2's changes.
+//
+// All queue properties can be updated. However, you can retrieve the properties
+// of private queues only if they are located on your local computer.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms703265(v=vs.85)
+func (qi *QueueInfo) Refresh() error {
+	_, err := qi.dispatch.CallMethod("Refresh")
+	if err != nil {
+		return fmt.Errorf("go-msmq: Refresh() failed to retrieve updated properties: %w", err)
+	}
+
+	return nil
+}
+
 // FormatName returns the format name.
 func (qi *QueueInfo) FormatName() (string, error) {
 	res, err := qi.dispatch.GetProperty("FormatName")
