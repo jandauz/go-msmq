@@ -141,6 +141,14 @@ func CreateQueueWithWorldReadable(worldReadable bool) CreateQueueOption {
 	}
 }
 
+// Delete deletes the queue that is managed by QueueInfo.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706050(v=vs.85)
+func (qi *QueueInfo) Delete() error {
+	_, err := qi.dispatch.CallMethod("Delete")
+	return fmt.Errorf("msmq: Delete() failed to delete queue: %w", err)
+}
+
 // Open opens a queue for sending, peeking at, retrieving, or purging messages
 // and creates a cursor for navigating the queue if the queue is being opened
 // for retrieving messages.
