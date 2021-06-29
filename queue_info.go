@@ -4,6 +4,7 @@ package msmq
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
@@ -77,7 +78,7 @@ func WithPathName(name string) QueueInfoOption {
 
 // ErrMSMQNotInstalled is returned when trying to interact with MSMQ but it is
 // not installed.
-var ErrMSMQNotInstalled = errors.New("msmq: message queuing has not been installed on this computer")
+var ErrMSMQNotInstalled = errors.New("go-msmq: message queuing has not been installed on this computer")
 
 // Create creates a public or private queue based on the options set on QueueInfo.
 //
@@ -94,6 +95,8 @@ var ErrMSMQNotInstalled = errors.New("msmq: message queuing has not been install
 //   if err != nil {
 //	     log.Error(err)
 //   }
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms703983(v=vs.85)
 func (qi *QueueInfo) Create(opts ...CreateQueueOption) error {
 	options := &createQueueOptions{
 		transactional: false,
@@ -105,7 +108,7 @@ func (qi *QueueInfo) Create(opts ...CreateQueueOption) error {
 
 	_, err := qi.dispatch.CallMethod("Create", options.transactional, options.worldReadable)
 	if err != nil {
-		return err
+		return fmt.Errorf("go-msmq: Create(%+v) failed to create queue: %w", options, err)
 	}
 	return nil
 }
@@ -146,7 +149,11 @@ func CreateQueueWithWorldReadable(worldReadable bool) CreateQueueOption {
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706050(v=vs.85)
 func (qi *QueueInfo) Delete() error {
 	_, err := qi.dispatch.CallMethod("Delete")
-	return fmt.Errorf("msmq: Delete() failed to delete queue: %w", err)
+	if err != nil {
+		return fmt.Errorf("go-msmq: Delete() failed to delete queue: %w", err)
+	}
+
+	return nil
 }
 
 // Open opens a queue for sending, peeking at, retrieving, or purging messages
@@ -157,7 +164,7 @@ func (qi *QueueInfo) Delete() error {
 func (qi *QueueInfo) Open(accessMode AccessMode, shareMode ShareMode) (*Queue, error) {
 	queue, err := qi.dispatch.CallMethod("Open", int(accessMode), int(shareMode))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("go-msmq: Open(%v, %v) failed to open queue: %w", accessMode, shareMode, err)
 	}
 
 	return &Queue{
@@ -206,7 +213,7 @@ const (
 func (qi *QueueInfo) FormatName() (string, error) {
 	res, err := qi.dispatch.GetProperty("FormatName")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("go-msmq: failed to get format name: %w", err)
 	}
 
 	return res.Value().(string), nil
@@ -217,7 +224,7 @@ func (qi *QueueInfo) FormatName() (string, error) {
 func (qi *QueueInfo) SetFormatName(name string) error {
 	_, err := qi.dispatch.PutProperty("FormatName", name)
 	if err != nil {
-		return err
+		return fmt.Errorf("go-msmq: SetFormatName(%s) failed to set format name: %w", name, err)
 	}
 
 	return nil
@@ -227,7 +234,7 @@ func (qi *QueueInfo) SetFormatName(name string) error {
 func (qi *QueueInfo) PathName() (string, error) {
 	res, err := qi.dispatch.GetProperty("PathName")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("go-msmq: failed to get path name: %w", err)
 	}
 
 	return res.Value().(string), nil
@@ -246,7 +253,7 @@ func (qi *QueueInfo) PathName() (string, error) {
 func (qi *QueueInfo) SetPathName(name string) error {
 	_, err := qi.dispatch.PutProperty("PathName", name)
 	if err != nil {
-		return err
+		return fmt.Errorf("go-msmq: SetPathName(%s) failed to set path name: %w", name, err)
 	}
 
 	return nil
