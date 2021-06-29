@@ -1,7 +1,10 @@
 // +build windows
+
 package msmq
 
 import (
+	"errors"
+
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 )
@@ -12,8 +15,8 @@ type QueueInfo struct {
 
 func NewQueueInfo() (*QueueInfo, error) {
 	unknown, err := oleutil.CreateObject("MSMQ.MSMQQueueInfo")
-	if err != nil {
-		return nil, err
+	if err != nil && err.Error() == "Invalid class string" {
+		return nil, ErrMSMQNotInstalled
 	}
 
 	dispatch, err := unknown.QueryInterface(ole.IID_IDispatch)
@@ -25,6 +28,8 @@ func NewQueueInfo() (*QueueInfo, error) {
 		dispatch: dispatch,
 	}, nil
 }
+
+var ErrMSMQNotInstalled = errors.New("msmq: message queuing has not been installed on this computer")
 
 func (qi *QueueInfo) Open(accessMode AccessMode, shareMode ShareMode) (*Queue, error) {
 	queue, err := qi.dispatch.CallMethod("Open", int(accessMode), int(shareMode))

@@ -11,8 +11,8 @@ type Message struct {
 
 func NewMessage() (Message, error) {
 	unknown, err := oleutil.CreateObject("MSMQ.MSMQMessage")
-	if err != nil {
-		return Message{}, err
+	if err != nil && err.Error() == "Invalid class string" {
+		return Message{}, ErrMSMQNotInstalled
 	}
 
 	dispatch, err := unknown.QueryInterface(ole.IID_IDispatch)
