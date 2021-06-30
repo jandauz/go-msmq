@@ -3,6 +3,7 @@
 package msmq
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/go-ole/go-ole"
@@ -28,8 +29,37 @@ func (q *Queue) Close() error {
 	return nil
 }
 
-func (q *Queue) Peek() (Message, error) {
-	msg, err := q.dispatch.CallMethod("Peek")
+// Peek returns the first message in the queue, or waits for a message to arrive
+// if the queue is empty. It does not remove the message from the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms704311(v=vs.85)
+func (q *Queue) Peek(opts ...PeekOption) (Message, error) {
+	open, err := q.IsOpen()
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: failed to peek message: %w", err)
+	}
+
+	if !open {
+		return Message{}, fmt.Errorf("go-msmq: failed to peek message: %w", errors.New("Exception occurred. (The queue is not open or might not exist. )"))
+	}
+
+	options := &peekOptions{
+		wantDestinationQueue: false,
+		wantBody:             false,
+		timeout:              1<<31 - 1,
+		wantConnectorType:    false,
+	}
+
+	for _, o := range opts {
+		o.set(options)
+	}
+
+	msg, err := q.dispatch.CallMethod(
+		"Peek",
+		options.wantDestinationQueue,
+		options.wantBody,
+		options.timeout,
+		options.wantConnectorType)
 	if err != nil {
 		return Message{}, err
 	}
@@ -37,6 +67,76 @@ func (q *Queue) Peek() (Message, error) {
 	return Message{
 		dispatch: msg.ToIDispatch(),
 	}, nil
+}
+
+// PeekOption represents an option to peek messages in a queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms704311(v=vs.85)
+type PeekOption struct {
+	set func(opts *peekOptions)
+}
+
+// peekOptions contains all the options to peek messages in a queue.
+type peekOptions struct {
+	wantDestinationQueue bool
+	wantBody             bool
+	timeout              int
+	wantConnectorType    bool
+}
+
+// PeekWithWantDestinationQueue returns a PeekOption that configures peeking
+// message with the specified want value.
+//
+// The default is false. If set to true, the Message.DestinationQueueInfo
+// property is updated when the message is read from the queue. Setting this
+// option to true may slow down the operation.
+func PeekWithWantDestinationQueue(want bool) PeekOption {
+	return PeekOption{
+		set: func(opts *peekOptions) {
+			opts.wantDestinationQueue = want
+		},
+	}
+}
+
+// PeekWithWantBody returns a PeekOption that configures peeking messages with
+// the specified want value.
+//
+// The default is true. It specifies that the body of the message should be
+// retrieved. If the message body is not needed, set this option to false to
+// optimize the speed of the application.
+func PeekWithWantBody(want bool) PeekOption {
+	return PeekOption{
+		set: func(opts *peekOptions) {
+			opts.wantBody = want
+		},
+	}
+}
+
+// PeekWithTimeout returns a PeekOption that configures peeking messages with
+// the specified timeout value.
+//
+// The default is infinite (max value of int). It specifies the time in
+// milliseconds that MSMQ will wait for a message to arrive.
+func PeekWithTimeout(timeout int) PeekOption {
+	return PeekOption{
+		set: func(opts *peekOptions) {
+			opts.timeout = timeout
+		},
+	}
+}
+
+// PeekWithWantConnectorType returns a PeekOption that configures peeking
+// messages with the specified want value.
+//
+// The default is false. It specifies that MSMQ does not retrieve the
+// Message.ConnectorTypeGuid property when it peeks at a message in the
+// queue
+func PeekWithWantConnectorType(want bool) PeekOption {
+	return PeekOption{
+		set: func(opts *peekOptions) {
+			opts.wantConnectorType = want
+		},
+	}
 }
 
 func (q *Queue) Receive() (Message, error) {
