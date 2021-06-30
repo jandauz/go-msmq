@@ -382,6 +382,46 @@ func (q *Queue) PeekNext(opts ...PeekOption) (Message, error) {
 	}, nil
 }
 
+// PeekNextByLookupID returns the message that follows the message referenced
+// by id but does not remove the message from the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706024(v=vs.85)
+func (q *Queue) PeekNextByLookupID(id uint64, opts ...PeekByLookupIDOption) (Message, error) {
+	open, err := q.IsOpen()
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: failed to peek next message by lookup id: %d: %w", id, err)
+	}
+
+	if !open {
+		return Message{}, fmt.Errorf("go-msmq: failed to peek next message by lookup id: %d: %w", id, errors.New("Exception occurred. (The queue is not open or might not exist. )"))
+	}
+
+	options := &peekByLookupIDOptions{
+		wantDestinationQueue: false,
+		wantBody:             true,
+		wantConnectorType:    false,
+	}
+
+	for _, o := range opts {
+		o.set(options)
+	}
+
+	msg, err := q.dispatch.CallMethod(
+		"PeekNextByLookupID",
+		id,
+		options.wantDestinationQueue,
+		options.wantBody,
+		options.wantConnectorType,
+	)
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: PeekNextByLookupID(%d) failed to peek next message by lookup id: %w", id, err)
+	}
+
+	return Message{
+		dispatch: msg.ToIDispatch(),
+	}, nil
+}
+
 func (q *Queue) Receive() (Message, error) {
 	msg, err := q.dispatch.CallMethod("Receive")
 	if err != nil {
