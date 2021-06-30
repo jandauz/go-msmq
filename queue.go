@@ -177,9 +177,7 @@ func (q *Queue) PeekByLookupID(id uint64, opts ...PeekByLookupIDOption) (Message
 	}, nil
 }
 
-// PeekOption represents an option to peek messages in a queue.
-//
-// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms704311(v=vs.85)
+// PeekByLookupIDOption represents an option to peek messages in a queue.
 type PeekByLookupIDOption struct {
 	set func(opts *peekByLookupIDOptions)
 }
@@ -301,6 +299,39 @@ func (q *Queue) PeekFirstByLookupID(opts ...PeekByLookupIDOption) (Message, erro
 	msg, err := q.dispatch.CallMethod("PeekFirstByLookupId")
 	if err != nil {
 		return Message{}, fmt.Errorf("go-msmq: PeekFirstByLookupID() failed to peek first message by lookup id: %w", err)
+	}
+
+	return Message{
+		dispatch: msg.ToIDispatch(),
+	}, nil
+}
+
+// PeekLastByLookupID returns the last message in the queue without removing
+// the message from the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms705194(v=vs.85)
+func (q *Queue) PeekLastByLookupID(opts ...PeekByLookupIDOption) (Message, error) {
+	open, err := q.IsOpen()
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: failed to peek last message by lookup id: %w", err)
+	}
+
+	if !open {
+		return Message{}, fmt.Errorf("go-msmq: failed to peek last message by lookup id: %w", errors.New("Exception occurred. (The queue is not open or might not exist. )"))
+	}
+
+	options := &peekByLookupIDOptions{
+		wantDestinationQueue: false,
+		wantBody:             true,
+		wantConnectorType:    false,
+	}
+	for _, o := range opts {
+		o.set(options)
+	}
+
+	msg, err := q.dispatch.CallMethod("PeekLastByLookupID")
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: PeekLastByLookupID() failed to peek last message by lookup id: %w", err)
 	}
 
 	return Message{
