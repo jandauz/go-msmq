@@ -462,6 +462,28 @@ func (q *Queue) PeekPreviousByLookupID(id uint64, opts ...PeekByLookupIDOption) 
 	}, nil
 }
 
+// Purge deletes all the messages in the queue. The queue must be opened with
+// Receive AccessMode in order to purge messages.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms703966(v=vs.85)
+func (q *Queue) Purge() error {
+	open, err := q.IsOpen()
+	if err != nil {
+		return fmt.Errorf("go-msmq: failed to purge messages: %w", err)
+	}
+
+	if !open {
+		return fmt.Errorf("go-msmq: failed to purge messages: %w", errors.New("Exception occurred. (The queue is not open or might not exist. )"))
+	}
+
+	_, err = q.dispatch.CallMethod("Purge")
+	if err != nil {
+		return fmt.Errorf("go-msmq: Purge() failed to delete all messages: %w", err)
+	}
+
+	return nil
+}
+
 func (q *Queue) Receive() (Message, error) {
 	msg, err := q.dispatch.CallMethod("Receive")
 	if err != nil {
