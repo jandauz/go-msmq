@@ -5,6 +5,7 @@ package msmq
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
@@ -55,8 +56,28 @@ type QueueInfoOption struct {
 	set func(qi *QueueInfo) error
 }
 
+// WithAuthenticate returns a QueueInfoOption that configures QueueInfo with the
+// specified Authenticate value.
+func WithAuthenticate(authenticate bool) QueueInfoOption {
+	return QueueInfoOption{
+		set: func(qi *QueueInfo) error {
+			return qi.SetAuthenticate(authenticate)
+		},
+	}
+}
+
+// WithBasePriority returns a QueueInfoOption that configures QueueInfo with the
+// specified BasePriority value.
+func WithBasePriority(priority int32) QueueInfoOption {
+	return QueueInfoOption{
+		set: func(qi *QueueInfo) error {
+			return qi.SetBasePriority(priority)
+		},
+	}
+}
+
 // WithFormatName returns a QueueInfoOption that configures QueueInfo with the
-// specified format name.
+// specified FormatName value.
 func WithFormatName(name string) QueueInfoOption {
 	return QueueInfoOption{
 		set: func(qi *QueueInfo) error {
@@ -65,12 +86,82 @@ func WithFormatName(name string) QueueInfoOption {
 	}
 }
 
+// WithJournal returns a QueueInfoOption that configures QueueInfo with the
+// specified Journal value.
+func WithJournal(enabled bool) QueueInfoOption {
+	return QueueInfoOption{
+		set: func(qi *QueueInfo) error {
+			return qi.SetJournal(enabled)
+		},
+	}
+}
+
+// WithJournalQuota returns a QueueInfoOption that configures QueueInfo with
+// the specified JournalQuota value.
+func WithJournalQuota(size int32) QueueInfoOption {
+	return QueueInfoOption{
+		set: func(qi *QueueInfo) error {
+			return qi.SetJournalQuota(size)
+		},
+	}
+}
+
+// WithLabel returns a QueueInfoOption that configures QueueInfo with the
+// specified Label value.
+func WithLabel(label string) QueueInfoOption {
+	return QueueInfoOption{
+		set: func(qi *QueueInfo) error {
+			return qi.SetLabel(label)
+		},
+	}
+}
+
+// WithMulticastAddress returns a QueueInfoOption that configures QueueInfo with the
+// specified MulticastAddress value.
+func WithMulticastAddress(address string) QueueInfoOption {
+	return QueueInfoOption{
+		set: func(qi *QueueInfo) error {
+			return qi.SetMulticastAddress(address)
+		},
+	}
+}
+
 // WithPathName returns a QueueInfoOption that configures QueueInfo with the
-// specified path name.
+// specified PathName value.
 func WithPathName(name string) QueueInfoOption {
 	return QueueInfoOption{
 		set: func(qi *QueueInfo) error {
 			return qi.SetPathName(name)
+		},
+	}
+}
+
+// WithPrivacyLevel returns a QueueInfoOption that configures QueueInfo with the
+// specified PrivacyLevel value.
+func WithPrivacyLevel(level PrivLevel) QueueInfoOption {
+	return QueueInfoOption{
+		set: func(qi *QueueInfo) error {
+			return qi.SetPrivacyLevel(level)
+		},
+	}
+}
+
+// WithQuota returns a QueueInfoOption that configures QueueInfo with
+// the specified Quota value.
+func WithQuota(size int32) QueueInfoOption {
+	return QueueInfoOption{
+		set: func(qi *QueueInfo) error {
+			return qi.SetQuota(size)
+		},
+	}
+}
+
+// WithServiceTypeGUID returns a QueueInfoOption that configures QueueInfo with
+// the specified ServiceTypeGUID value.
+func WithServiceTypeGUID(guid string) QueueInfoOption {
+	return QueueInfoOption{
+		set: func(qi *QueueInfo) error {
+			return qi.SetServiceTypeGUID(guid)
 		},
 	}
 }
@@ -97,6 +188,15 @@ var ErrMSMQNotInstalled = errors.New("go-msmq: message queuing has not been inst
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms703983(v=vs.85)
 func (qi *QueueInfo) Create(opts ...CreateQueueOption) error {
+	s, err := qi.PathName()
+	if err != nil {
+		return fmt.Errorf("go-msmq: failed to create queue: %w", err)
+	}
+
+	if s == "" {
+		return fmt.Errorf("go-msmq: failed to create queue: %w", errors.New("Exception occurred. (The queue path name is not set. )"))
+	}
+
 	options := &createQueueOptions{
 		transactional: false,
 		worldReadable: false,
@@ -105,9 +205,9 @@ func (qi *QueueInfo) Create(opts ...CreateQueueOption) error {
 		o.set(options)
 	}
 
-	_, err := qi.dispatch.CallMethod("Create", options.transactional, options.worldReadable)
+	_, err = qi.dispatch.CallMethod("Create", options.transactional, options.worldReadable)
 	if err != nil {
-		return fmt.Errorf("go-msmq: Create(%+v) failed to create queue: %w", options, err)
+		return fmt.Errorf("go-msmq: Create(%v, %v) failed to create queue: %w", options.transactional, options.worldReadable, err)
 	}
 	return nil
 }
@@ -177,22 +277,22 @@ type AccessMode int
 
 const (
 	// Receive grants permissions to read, peek, and delete messages from a local queue.
-	Receive = 1
+	Receive AccessMode = 1
 
 	// Send grants permissions to insert new messages into a queue.
-	Send = 2
+	Send AccessMode = 2
 
 	// Peek grants permissions to peek but not delete messages from a local queue.
-	Peek = 32
+	Peek AccessMode = 32
 
 	// admin specifies that a remote queue is to be opened.
-	admin = 128
+	admin AccessMode = 128
 
 	// PeekAndAdmin grants Peek permissions to a remote queue.
-	PeekAndAdmin = Peek | admin
+	PeekAndAdmin AccessMode = Peek | admin
 
 	// ReceiveAndAdmin grants Receive permissions to a remote queue.
-	ReceiveAndAdmin = Receive | admin
+	ReceiveAndAdmin AccessMode = Receive | admin
 )
 
 // ShareMode defines the exclusivity level when accessing a queue. Default
@@ -202,10 +302,10 @@ type ShareMode int
 const (
 	// DenyNone indicates that accessing a queue is available to all members
 	// of the EVERYONE group.
-	DenyNone = 0
+	DenyNone ShareMode = 0
 
 	// DenyReceive limits access to other processes.
-	DenyReceive = 1
+	DenyReceive ShareMode = 1
 )
 
 // Refresh updates the properties of QueueInfo. For example, if user 1 locates
@@ -241,11 +341,90 @@ func (qi *QueueInfo) Update() error {
 	return nil
 }
 
+// ADsPath returns the Active Directory Domain Services (AD DS) path to the
+// public queue.
+func (qi *QueueInfo) ADsPath() (string, error) {
+	res, err := qi.dispatch.GetProperty("ADsPath")
+	if err != nil {
+		return "", fmt.Errorf("go-msmq: failed to get AD path: %w", err)
+	}
+
+	return res.Value().(string), nil
+}
+
+// Authenticate returns authenticate.
+func (qi *QueueInfo) Authenticate() (bool, error) {
+	res, err := qi.dispatch.GetProperty("Authenticate")
+	if err != nil {
+		return false, fmt.Errorf("go-msmq: failed to get Authenticate: %w", err)
+	}
+
+	i := res.Value().(int32)
+	return i != 0, nil
+}
+
+// SetAuthenticate sets authenticate. Authenticate specifies whether the queue
+// only accepts authenticated messages.
+//
+// The default value is false. The queue accepts authenticated and non-authenticated
+// messages.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms703976(v=vs.85)
+func (qi *QueueInfo) SetAuthenticate(authenticate bool) error {
+	i := 0
+	if authenticate {
+		i = 1
+	}
+
+	_, err := qi.dispatch.PutProperty("Authenticate", i)
+	if err != nil {
+		return fmt.Errorf("go-msmq: SetAuthenticate(%v) failed to set Authenticate: %w", i, err)
+	}
+
+	return nil
+}
+
+// BasePriority returns the base priority.
+func (qi *QueueInfo) BasePriority() (int32, error) {
+	res, err := qi.dispatch.GetProperty("BasePriority")
+	if err != nil {
+		return 0, fmt.Errorf("go-msmq: failed to get BasePriority: %w", err)
+	}
+
+	return res.Value().(int32), nil
+}
+
+// SetBasePriority sets base prioirty. Base priority specifies the base priority
+// for all messages sent to a public queue.
+//
+// The default value is 0.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms701847(v=vs.85)
+func (qi *QueueInfo) SetBasePriority(priority int32) error {
+	_, err := qi.dispatch.PutProperty("BasePriority", priority)
+	if err != nil {
+		return fmt.Errorf("go-msmq: SetBasePriority(%d) failed to set BasePriority: %w", priority, err)
+	}
+
+	return nil
+}
+
+// CreateTime returns when the public queue or private queue was created. The
+// the value is automatically converted to the local system time and system date.
+func (qi *QueueInfo) CreateTime() (time.Time, error) {
+	res, err := qi.dispatch.GetProperty("CreateTime")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("go-msmq: failed to get CreateTime: %w", err)
+	}
+
+	return res.Value().(time.Time), nil
+}
+
 // FormatName returns the format name.
 func (qi *QueueInfo) FormatName() (string, error) {
 	res, err := qi.dispatch.GetProperty("FormatName")
 	if err != nil {
-		return "", fmt.Errorf("go-msmq: failed to get format name: %w", err)
+		return "", fmt.Errorf("go-msmq: failed to get FormatName: %w", err)
 	}
 
 	return res.Value().(string), nil
@@ -253,10 +432,144 @@ func (qi *QueueInfo) FormatName() (string, error) {
 
 // SetFormatName sets the format name. Format names are used to reference public
 // or private queues without accessing directory service.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms705703(v=vs.85)
 func (qi *QueueInfo) SetFormatName(name string) error {
 	_, err := qi.dispatch.PutProperty("FormatName", name)
 	if err != nil {
-		return fmt.Errorf("go-msmq: SetFormatName(%s) failed to set format name: %w", name, err)
+		return fmt.Errorf("go-msmq: SetFormatName(%s) failed to set FormatName: %w", name, err)
+	}
+
+	return nil
+}
+
+// IsTransactional indicates whether the queue supports transactions.
+func (qi *QueueInfo) IsTransactional() (bool, error) {
+	res, err := qi.dispatch.GetProperty("IsTransactional2")
+	if err != nil {
+		return false, fmt.Errorf("go-msmq: failed to get IsTransactional2: %w", err)
+	}
+
+	return res.Value().(bool), nil
+}
+
+// IsWorldReadable indicates whether all members of the Everyone group can
+// read the messages in the queue.
+func (qi *QueueInfo) IsWorldReadable() (bool, error) {
+	res, err := qi.dispatch.GetProperty("IsWorldReadable2")
+	if err != nil {
+		return false, fmt.Errorf("go-msmq: failed to get IsWorldReadable: %w", err)
+	}
+
+	return res.Value().(bool), nil
+}
+
+// Journal returns whether messages retrieved from the queue are stored in the
+// journal of the queue.
+func (qi *QueueInfo) Journal() (bool, error) {
+	res, err := qi.dispatch.GetProperty("Journal")
+	if err != nil {
+		return false, fmt.Errorf("go-msmq: failed to get Journal: %w", err)
+	}
+
+	i := res.Value().(int32)
+	return i != 0, nil
+}
+
+// SetJournal specifies whether the messages retrieved from the queue are stored
+// in the journal of the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms701492(v=vs.85)
+func (qi *QueueInfo) SetJournal(enabled bool) error {
+	i := 0
+	if enabled {
+		i = 1
+	}
+
+	_, err := qi.dispatch.PutProperty("Journal", i)
+	if err != nil {
+		return fmt.Errorf("go-msmq: SetJournal(%v) failed to set Journal: %w", enabled, err)
+	}
+
+	return nil
+}
+
+// JournalQuota returns the maximum size (in kilobytes) of the queue journal.
+func (qi *QueueInfo) JournalQuota() (int32, error) {
+	res, err := qi.dispatch.GetProperty("JournalQuota")
+	if err != nil {
+		return 0, fmt.Errorf("go-msmq: failed to get JournalQuota: %w", err)
+	}
+
+	return res.Value().(int32), nil
+}
+
+// SetJournalQuota specifies the maximum size (in kilobytes) of the queue journal.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms700230(v=vs.85)
+func (qi *QueueInfo) SetJournalQuota(size int32) error {
+	_, err := qi.dispatch.PutProperty("JournalQuota", size)
+	if err != nil {
+		return fmt.Errorf("go-msmq: SetJournalQuota(%d) failed to set JournalQuota: %w", size, err)
+	}
+
+	return nil
+}
+
+// Label returns the description of the queue.
+func (qi *QueueInfo) Label() (string, error) {
+	res, err := qi.dispatch.GetProperty("Label")
+	if err != nil {
+		return "", fmt.Errorf("go-msmq: failed to get Label: %w", err)
+	}
+
+	return res.Value().(string), nil
+}
+
+// SetLabel sets the description of the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms701520(v=vs.85)
+func (qi *QueueInfo) SetLabel(label string) error {
+	_, err := qi.dispatch.PutProperty("Label", label)
+	if err != nil {
+		return fmt.Errorf("go-msmq: SetLabel(%s) failed to set Label: %w", label, err)
+	}
+
+	return nil
+}
+
+// ModifyTime returns when the public queue or private queue was last updated. The
+// the value is automatically converted to the local system time and system date.
+func (qi *QueueInfo) ModifyTime() (time.Time, error) {
+	res, err := qi.dispatch.GetProperty("ModifyTime")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("go-msmq: failed to get ModifyTime: %w", err)
+	}
+
+	return res.Value().(time.Time), nil
+}
+
+// MulticastAddress returns the multicast address associated with the queue.
+func (qi *QueueInfo) MulticastAddress() (string, error) {
+	res, err := qi.dispatch.GetProperty("MulticastAddress")
+	if err != nil {
+		return "", fmt.Errorf("go-msmq: failed to get MulticastAddress: %w", err)
+	}
+
+	return res.Value().(string), nil
+}
+
+// SetMulticastAddress sets the multicast address of the queue. The value of
+// address should be in the form:
+//   <address>:<port>
+// An empty string can also be specified to indicate that the queue is not
+// associated with a multicast address.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms704978(v=vs.85)
+func (qi *QueueInfo) SetMulticastAddress(address string) error {
+	_, err := qi.dispatch.PutProperty("MulticastAddress", address)
+	if err != nil {
+		return fmt.Errorf("go-msmq: SetMulticastAddress(%s) failed to set MulticastAddress: %w", address, err)
 	}
 
 	return nil
@@ -266,7 +579,7 @@ func (qi *QueueInfo) SetFormatName(name string) error {
 func (qi *QueueInfo) PathName() (string, error) {
 	res, err := qi.dispatch.GetProperty("PathName")
 	if err != nil {
-		return "", fmt.Errorf("go-msmq: failed to get path name: %w", err)
+		return "", fmt.Errorf("go-msmq: failed to get PathName: %w", err)
 	}
 
 	return res.Value().(string), nil
@@ -285,7 +598,122 @@ func (qi *QueueInfo) PathName() (string, error) {
 func (qi *QueueInfo) SetPathName(name string) error {
 	_, err := qi.dispatch.PutProperty("PathName", name)
 	if err != nil {
-		return fmt.Errorf("go-msmq: SetPathName(%s) failed to set path name: %w", name, err)
+		return fmt.Errorf("go-msmq: SetPathName(%s) failed to set PathName: %w", name, err)
+	}
+
+	return nil
+}
+
+// PathNameDNS returns the DNS path name of the queue.
+func (qi *QueueInfo) PathNameDNS() (string, error) {
+	res, err := qi.dispatch.GetProperty("PathNameDNS")
+	if err != nil {
+		return "", fmt.Errorf("go-msmq: failed to get PathNameDNS: %w", err)
+	}
+
+	return res.Value().(string), nil
+}
+
+// PrivLevel returns the privacy level.
+func (qi *QueueInfo) PrivacyLevel() (PrivLevel, error) {
+	res, err := qi.dispatch.GetProperty("PrivLevel")
+	if err != nil {
+		return 0, fmt.Errorf("go-msmq: failed to get PrivLevel: %w", err)
+	}
+
+	return PrivLevel(res.Value().(int32)), nil
+}
+
+// SetPrivacyLevel sets the privacy level of the queue. The default value is
+// PrivLevel.Optional.
+//
+// If the privacy level of a message does not correspond to the privacy level
+// of the queue, the message is rejected by the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms701989(v=vs.85)
+func (qi *QueueInfo) SetPrivacyLevel(level PrivLevel) error {
+	_, err := qi.dispatch.PutProperty("PrivLevel", int(level))
+	if err != nil {
+		return fmt.Errorf("go-msmq: SetPrivacyLevel(%v) failed to set PrivLevel: %w", level, err)
+	}
+
+	return nil
+}
+
+// PrivLevel defines the privacy level of the queue. Default value is Optional.
+type PrivLevel int
+
+const (
+	// NonPrivate specifies that the queue accepts only non-private (clear) messages.
+	NonPrivate PrivLevel = 0
+
+	// OptionalPrivate specifies that the queue does not force privacy. It accepts
+	// private (encrypted) messages and non-private (clear) messages.
+	OptionalPrivate PrivLevel = 1
+
+	// OnlyPrivate specifies that the queue accepts only private (encrypted) messages.
+	OnlyPrivate PrivLevel = 2
+)
+
+// QueueGUID returns GUID of the public queue in the form:
+//   {12345678-1234-1234-1234-123456789ABC}
+func (qi *QueueInfo) QueueGUID() (string, error) {
+	res, err := qi.dispatch.GetProperty("QueueGuid")
+	if err != nil {
+		return "", fmt.Errorf("go-msmq: failed to get QueueGuid : %w", err)
+	}
+
+	return res.Value().(string), nil
+}
+
+// Quota returns the maximum size (in kilobytes) of the queue.
+func (qi *QueueInfo) Quota() (int32, error) {
+	res, err := qi.dispatch.GetProperty("Quota")
+	if err != nil {
+		return 0, fmt.Errorf("go-msmq: failed to get Quota: %w", err)
+	}
+
+	return res.Value().(int32), nil
+}
+
+// SetQuota specifies the maximum size (in kilobytes) of the queue. The default
+// is INFINITE - this is limited only by the available disk space on the local
+// computer or the computer quota.
+//
+// When the quota of the queue is changed, the new quota affects only arriving
+// messages; it does not affect messages already in the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms707016(v=vs.85)
+func (qi *QueueInfo) SetQuota(size int32) error {
+	_, err := qi.dispatch.PutProperty("Quota", size)
+	if err != nil {
+		return fmt.Errorf("go-msmq: SetQuota(%d) failed to set Quota: %w", size, err)
+	}
+
+	return nil
+}
+
+// ServiceTypeGUID returns the GUID that specifies the type of service provided
+// by the queue in the form:
+//   {12345678-1234-1234-1234-123456789ABC}
+func (qi *QueueInfo) ServiceTypeGUID() (string, error) {
+	res, err := qi.dispatch.GetProperty("ServiceTypeGuid")
+	if err != nil {
+		return "", fmt.Errorf("go-msmq: failed to get ServiceTypeGUID: %w", err)
+	}
+
+	return res.Value().(string), nil
+}
+
+// SetServiceTypeGUID specifies the type of service provided by the queue. It is
+// used to identify the queue by its type of service. This identifier can be used
+// to locate public queues registered in the directory service.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms703206(v=vs.85)
+func (qi *QueueInfo) SetServiceTypeGUID(guid string) error {
+	_, err := qi.dispatch.PutProperty("ServiceTypeGuid", guid)
+	if err != nil {
+		return fmt.Errorf("go-msmq: SetServiceTypeGUID(%s) failed to set ServiceTypeGuid: %w", guid, err)
 	}
 
 	return nil
