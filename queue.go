@@ -233,6 +233,48 @@ func PeekByLookupWithWantConnectorType(want bool) PeekByLookupIDOption {
 	}
 }
 
+// PeekCurrent returns the message at the current cursor position and moves the
+// cursor to the next message, or waits for a message to arrive, but does not
+// remove the message from the queue. If the cursor does not point to a specific
+// message location, PeekCurrent moves the cursor to the front of the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706182(v=vs.85)
+func (q *Queue) PeekCurrent(opts ...PeekOption) (Message, error) {
+	open, err := q.IsOpen()
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: failed to peek current message: %w", err)
+	}
+
+	if !open {
+		return Message{}, fmt.Errorf("go-msmq: failed to peek current message: %w", errors.New("Exception occurred. (The queue is not open or might not exist. )"))
+	}
+
+	options := &peekOptions{
+		wantDestinationQueue: false,
+		wantBody:             false,
+		timeout:              1<<31 - 1,
+		wantConnectorType:    false,
+	}
+
+	for _, o := range opts {
+		o.set(options)
+	}
+
+	msg, err := q.dispatch.CallMethod(
+		"PeekCurrent",
+		options.wantDestinationQueue,
+		options.wantBody,
+		options.timeout,
+		options.wantConnectorType)
+	if err != nil {
+		return Message{}, err
+	}
+
+	return Message{
+		dispatch: msg.ToIDispatch(),
+	}, nil
+}
+
 func (q *Queue) Receive() (Message, error) {
 	msg, err := q.dispatch.CallMethod("Receive")
 	if err != nil {
