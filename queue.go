@@ -355,8 +355,17 @@ func (q *Queue) Purge() error {
 	return nil
 }
 
-func (q *Queue) Receive() (Message, error) {
-	msg, err := q.dispatch.CallMethod("Receive")
+// Receive retrieves the first message in the queue, removing the message from
+// the queue when the message is read. It does not use the cursor created when
+// the queue is opened, and should not be called when navigating the queue
+// using the cursor.
+//
+// If no message is found, Receive will block until a message arrives in the
+// queue or the timeout specified has expired.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706017(v=vs.85)
+func (q *Queue) Receive(opts ...ReceiveOption) (Message, error) {
+	msg, err := q.receive("Receive", opts)
 	if err != nil {
 		return Message{}, err
 	}
@@ -364,6 +373,117 @@ func (q *Queue) Receive() (Message, error) {
 	return Message{
 		dispatch: msg.ToIDispatch(),
 	}, nil
+}
+
+// ReceiveOption represents an option to receive messages from a queue.
+type ReceiveOption struct {
+	set (func(o *receiveOptions))
+}
+
+// receiveOptions contains all the options to receive messages from a queue.
+type receiveOptions struct {
+	level                TransactionLevel
+	wantDestinationQueue bool
+	wantBody             bool
+	timeout              int
+	wantConnectorType    bool
+}
+
+// ReceiveWithTransaction returns a ReceiveOption that configures receiving
+// messages from a queue with the specified level value.
+//
+// The default is MTS.
+func ReceiveWithTransaction(level TransactionLevel) ReceiveOption {
+	return ReceiveOption{
+		set: func(o *receiveOptions) {
+			o.level = level
+		},
+	}
+}
+
+// ReceiveWithWantDestinationQueue returns a ReceiveOption that configures receiving
+// messages from a queue with the specified want value.
+//
+// The default is false. If set to true, the Message.DestinationQueueInfo
+// property is updated when the message is read from the queue. Setting this
+// option to true may slow down the operation.
+func ReceiveWithWantDestinationQueue(want bool) ReceiveOption {
+	return ReceiveOption{
+		set: func(opts *receiveOptions) {
+			opts.wantDestinationQueue = want
+		},
+	}
+}
+
+// ReceiveWithWantBody returns a ReceiveOption that configures receiving
+// messages from a queue with the specified want value.
+//
+// The default is true. It specifies that the body of the message should be
+// retrieved. If the message body is not needed, set this option to false to
+// optimize the speed of the application.
+func ReceiveWithWantBody(want bool) ReceiveOption {
+	return ReceiveOption{
+		set: func(opts *receiveOptions) {
+			opts.wantBody = want
+		},
+	}
+}
+
+// ReceiveWithTimeout returns a ReceiveOption that configures receiving messages
+// with the specified timeout value.
+//
+// The default is infinite (max value of int). It specifies the time in
+// milliseconds that MSMQ will wait for a message to arrive.
+func ReceiveWithTimeout(timeout int) ReceiveOption {
+	return ReceiveOption{
+		set: func(opts *receiveOptions) {
+			opts.timeout = timeout
+		},
+	}
+}
+
+// ReceiveWithWantConnectorType returns a ReceiveOption that configures receiving
+// messages with the specified want value.
+//
+// The default is false. It specifies that MSMQ does not retrieve the
+// Message.ConnectorTypeGuid property when it receives a message in the
+// queue.
+func ReceiveWithWantConnectorType(want bool) ReceiveOption {
+	return ReceiveOption{
+		set: func(opts *receiveOptions) {
+			opts.wantConnectorType = want
+		},
+	}
+}
+
+func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, error) {
+	open, err := q.IsOpen()
+	if err != nil {
+		return nil, err
+	}
+
+	if !open {
+		return nil, errors.New("Exception occurred. (The queue is not open or might not exist. )")
+	}
+
+	switch action {
+	case "Receive", "ReceiveCurrent":
+		options := &receiveOptions{
+			level:                MTS,
+			wantDestinationQueue: false,
+			wantBody:             true,
+			timeout:              1<<31 - 1,
+			wantConnectorType:    false,
+		}
+
+		for _, o := range params[0].([]ReceiveOption) {
+			o.set(options)
+		}
+
+		return q.dispatch.CallMethod(action, int(options.level), options.wantDestinationQueue, options.wantBody, options.timeout, options.wantConnectorType)
+	default:
+		return nil, nil
+	}
 }
 
 func (q *Queue) IsOpen() (bool, error) {

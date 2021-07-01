@@ -43,9 +43,8 @@ func NewQueueInfo(opts ...QueueInfoOption) (*QueueInfo, error) {
 	for _, o := range opts {
 		err = o.set(queueInfo)
 		if err != nil {
-			return nil, fmt.Errorf("msmq: failed to create new QueueInfo: %w", err)
+			return nil, fmt.Errorf("go-msmq: failed to create new QueueInfo: %w", err)
 		}
-
 	}
 
 	return queueInfo, nil
