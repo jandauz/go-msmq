@@ -34,32 +34,7 @@ func (q *Queue) Close() error {
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms704311(v=vs.85)
 func (q *Queue) Peek(opts ...PeekOption) (Message, error) {
-	open, err := q.IsOpen()
-	if err != nil {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek message: %w", err)
-	}
-
-	if !open {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek message: %w", errors.New("Exception occurred. (The queue is not open or might not exist. )"))
-	}
-
-	options := &peekOptions{
-		wantDestinationQueue: false,
-		wantBody:             false,
-		timeout:              1<<31 - 1,
-		wantConnectorType:    false,
-	}
-
-	for _, o := range opts {
-		o.set(options)
-	}
-
-	msg, err := q.dispatch.CallMethod(
-		"Peek",
-		options.wantDestinationQueue,
-		options.wantBody,
-		options.timeout,
-		options.wantConnectorType)
+	msg, err := q.peek("Peek", opts)
 	if err != nil {
 		return Message{}, err
 	}
@@ -142,32 +117,7 @@ func PeekWithWantConnectorType(want bool) PeekOption {
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms699797(v=vs.85)
 func (q *Queue) PeekByLookupID(id uint64, opts ...PeekByLookupIDOption) (Message, error) {
-	open, err := q.IsOpen()
-	if err != nil {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek message by lookup id: %d: %w", id, err)
-	}
-
-	if !open {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek message by lookup id: %d: %w", id, errors.New("Exception occurred. (The queue is not open or might not exist. )"))
-	}
-
-	options := &peekByLookupIDOptions{
-		wantDestinationQueue: false,
-		wantBody:             true,
-		wantConnectorType:    false,
-	}
-
-	for _, o := range opts {
-		o.set(options)
-	}
-
-	msg, err := q.dispatch.CallMethod(
-		"PeekByLookupId",
-		id,
-		options.wantDestinationQueue,
-		options.wantBody,
-		options.wantConnectorType,
-	)
+	msg, err := q.peek("PeekByLookupID", id, opts)
 	if err != nil {
 		return Message{}, fmt.Errorf("go-msmq: PeekByLookupID(%d) failed to peek message by lookup id: %w", id, err)
 	}
@@ -238,34 +188,9 @@ func PeekByLookupWithWantConnectorType(want bool) PeekByLookupIDOption {
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706182(v=vs.85)
 func (q *Queue) PeekCurrent(opts ...PeekOption) (Message, error) {
-	open, err := q.IsOpen()
+	msg, err := q.peek("PeekCurrent", opts)
 	if err != nil {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek current message: %w", err)
-	}
-
-	if !open {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek current message: %w", errors.New("Exception occurred. (The queue is not open or might not exist. )"))
-	}
-
-	options := &peekOptions{
-		wantDestinationQueue: false,
-		wantBody:             false,
-		timeout:              1<<31 - 1,
-		wantConnectorType:    false,
-	}
-
-	for _, o := range opts {
-		o.set(options)
-	}
-
-	msg, err := q.dispatch.CallMethod(
-		"PeekCurrent",
-		options.wantDestinationQueue,
-		options.wantBody,
-		options.timeout,
-		options.wantConnectorType)
-	if err != nil {
-		return Message{}, err
+		return Message{}, fmt.Errorf("go-msmq: PeekCurrent() failed to peek current message: %w", err)
 	}
 
 	return Message{
@@ -278,25 +203,7 @@ func (q *Queue) PeekCurrent(opts ...PeekOption) (Message, error) {
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms711410(v=vs.85)
 func (q *Queue) PeekFirstByLookupID(opts ...PeekByLookupIDOption) (Message, error) {
-	open, err := q.IsOpen()
-	if err != nil {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek first message by lookup id: %w", err)
-	}
-
-	if !open {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek first message by lookup id: %w", errors.New("Exception occurred. (The queue is not open or might not exist. )"))
-	}
-
-	options := &peekByLookupIDOptions{
-		wantDestinationQueue: false,
-		wantBody:             true,
-		wantConnectorType:    false,
-	}
-	for _, o := range opts {
-		o.set(options)
-	}
-
-	msg, err := q.dispatch.CallMethod("PeekFirstByLookupId")
+	msg, err := q.peek("PeekFirstByLookupID", opts)
 	if err != nil {
 		return Message{}, fmt.Errorf("go-msmq: PeekFirstByLookupID() failed to peek first message by lookup id: %w", err)
 	}
@@ -311,25 +218,7 @@ func (q *Queue) PeekFirstByLookupID(opts ...PeekByLookupIDOption) (Message, erro
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms705194(v=vs.85)
 func (q *Queue) PeekLastByLookupID(opts ...PeekByLookupIDOption) (Message, error) {
-	open, err := q.IsOpen()
-	if err != nil {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek last message by lookup id: %w", err)
-	}
-
-	if !open {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek last message by lookup id: %w", errors.New("Exception occurred. (The queue is not open or might not exist. )"))
-	}
-
-	options := &peekByLookupIDOptions{
-		wantDestinationQueue: false,
-		wantBody:             true,
-		wantConnectorType:    false,
-	}
-	for _, o := range opts {
-		o.set(options)
-	}
-
-	msg, err := q.dispatch.CallMethod("PeekLastByLookupID")
+	msg, err := q.peek("PeekLastByLookupID", opts)
 	if err != nil {
 		return Message{}, fmt.Errorf("go-msmq: PeekLastByLookupID() failed to peek last message by lookup id: %w", err)
 	}
@@ -347,32 +236,7 @@ func (q *Queue) PeekLastByLookupID(opts ...PeekByLookupIDOption) (Message, error
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms703247(v=vs.85)
 func (q *Queue) PeekNext(opts ...PeekOption) (Message, error) {
-	open, err := q.IsOpen()
-	if err != nil {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek next message: %w", err)
-	}
-
-	if !open {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek next message: %w", errors.New("Exception occurred. (The queue is not open or might not exist. )"))
-	}
-
-	options := &peekOptions{
-		wantDestinationQueue: false,
-		wantBody:             false,
-		timeout:              1<<31 - 1,
-		wantConnectorType:    false,
-	}
-
-	for _, o := range opts {
-		o.set(options)
-	}
-
-	msg, err := q.dispatch.CallMethod(
-		"PeekNext",
-		options.wantDestinationQueue,
-		options.wantBody,
-		options.timeout,
-		options.wantConnectorType)
+	msg, err := q.peek("PeekNext", opts)
 	if err != nil {
 		return Message{}, fmt.Errorf("go-msmq: failed to peek next message: %w", err)
 	}
@@ -387,32 +251,7 @@ func (q *Queue) PeekNext(opts ...PeekOption) (Message, error) {
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706024(v=vs.85)
 func (q *Queue) PeekNextByLookupID(id uint64, opts ...PeekByLookupIDOption) (Message, error) {
-	open, err := q.IsOpen()
-	if err != nil {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek next message by lookup id: %d: %w", id, err)
-	}
-
-	if !open {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek next message by lookup id: %d: %w", id, errors.New("Exception occurred. (The queue is not open or might not exist. )"))
-	}
-
-	options := &peekByLookupIDOptions{
-		wantDestinationQueue: false,
-		wantBody:             true,
-		wantConnectorType:    false,
-	}
-
-	for _, o := range opts {
-		o.set(options)
-	}
-
-	msg, err := q.dispatch.CallMethod(
-		"PeekNextByLookupID",
-		id,
-		options.wantDestinationQueue,
-		options.wantBody,
-		options.wantConnectorType,
-	)
+	msg, err := q.peek("PeekNextByLookupID", id, opts)
 	if err != nil {
 		return Message{}, fmt.Errorf("go-msmq: PeekNextByLookupID(%d) failed to peek next message by lookup id: %w", id, err)
 	}
@@ -427,32 +266,7 @@ func (q *Queue) PeekNextByLookupID(id uint64, opts ...PeekByLookupIDOption) (Mes
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706024(v=vs.85)
 func (q *Queue) PeekPreviousByLookupID(id uint64, opts ...PeekByLookupIDOption) (Message, error) {
-	open, err := q.IsOpen()
-	if err != nil {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek previous message by lookup id: %d: %w", id, err)
-	}
-
-	if !open {
-		return Message{}, fmt.Errorf("go-msmq: failed to peek previous message by lookup id: %d: %w", id, errors.New("Exception occurred. (The queue is not open or might not exist. )"))
-	}
-
-	options := &peekByLookupIDOptions{
-		wantDestinationQueue: false,
-		wantBody:             true,
-		wantConnectorType:    false,
-	}
-
-	for _, o := range opts {
-		o.set(options)
-	}
-
-	msg, err := q.dispatch.CallMethod(
-		"PeekPreviousByLookupId",
-		id,
-		options.wantDestinationQueue,
-		options.wantBody,
-		options.wantConnectorType,
-	)
+	msg, err := q.peek("PeekPreviousByLookupID", id, opts)
 	if err != nil {
 		return Message{}, fmt.Errorf("go-msmq: PeekPreviousByLookupID(%d) failed to peek previous message by lookup id: %w", id, err)
 	}
@@ -460,6 +274,63 @@ func (q *Queue) PeekPreviousByLookupID(id uint64, opts ...PeekByLookupIDOption) 
 	return Message{
 		dispatch: msg.ToIDispatch(),
 	}, nil
+}
+
+func (q *Queue) peek(action string, params ...interface{}) (*ole.VARIANT, error) {
+	open, err := q.IsOpen()
+	if err != nil {
+		return nil, err
+	}
+
+	if !open {
+		return nil, errors.New("Exception occurred. (The queue is not open or might not exist. )")
+	}
+
+	switch action {
+	case "Peek", "PeekCurrent", "PeekNext":
+		options := &peekOptions{
+			wantDestinationQueue: false,
+			wantBody:             false,
+			timeout:              1<<31 - 1,
+			wantConnectorType:    false,
+		}
+
+		for _, o := range params[0].([]PeekOption) {
+			o.set(options)
+		}
+
+		return q.dispatch.CallMethod(action, options.wantDestinationQueue, options.wantBody, options.timeout, options.wantConnectorType)
+
+	case "PeekByLookupID", "PeekNextByLookupID", "PeekPreviousByLookupID":
+		id := params[0].(uint64)
+		options := &peekByLookupIDOptions{
+			wantDestinationQueue: false,
+			wantBody:             true,
+			wantConnectorType:    false,
+		}
+
+		for _, o := range params[1].([]PeekByLookupIDOption) {
+			o.set(options)
+		}
+
+		return q.dispatch.CallMethod(action, id, options.wantDestinationQueue, options.wantBody, options.wantConnectorType)
+
+	case "PeekFirstByLookupID", "PeekLastByLookupID":
+		options := &peekByLookupIDOptions{
+			wantDestinationQueue: false,
+			wantBody:             true,
+			wantConnectorType:    false,
+		}
+
+		for _, o := range params[0].([]PeekByLookupIDOption) {
+			o.set(options)
+		}
+
+		return q.dispatch.CallMethod(action, options.wantDestinationQueue, options.wantBody, options.wantConnectorType)
+
+	default:
+		return nil, nil
+	}
 }
 
 // Purge deletes all the messages in the queue. The queue must be opened with
