@@ -541,6 +541,23 @@ func ReceiveByLookupIDWithWantConnectorType(want bool) ReceiveByLookupIDOption {
 	}
 }
 
+// ReceiveCurrent returns the message at the current cursor position, removes the
+// message from the queue, and moves the cursor to the next message, or waits for
+// a message to arrive. If the cursor does not point to a specific message location,
+// ReceiveCurrent moves the cursor to the front of the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706011(v=vs.85)
+func (q *Queue) ReceiveCurrent(opts ...ReceiveOption) (Message, error) {
+	msg, err := q.receive("ReceiveCurrent", opts)
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: ReceiveCurrent() failed to receive message at the current cursor location: %w", err)
+	}
+
+	return Message{
+		dispatch: msg.ToIDispatch(),
+	}, nil
+}
+
 func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, error) {
 	open, err := q.IsOpen()
 	if err != nil {
