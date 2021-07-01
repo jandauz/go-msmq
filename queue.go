@@ -456,6 +456,91 @@ func ReceiveWithWantConnectorType(want bool) ReceiveOption {
 	}
 }
 
+// ReceiveByLookupID returns the message referenced by id and removes the message
+// from the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms701233(v=vs.85)
+func (q *Queue) ReceiveByLookupID(id uint64, opts ...ReceiveByLookupIDOption) (Message, error) {
+	msg, err := q.receive("ReceiveByLookupID", id, opts)
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: ReceiveByLookupID(%d) failed to receive messages by lookup id: %w", id, err)
+	}
+
+	return Message{
+		dispatch: msg.ToIDispatch(),
+	}, nil
+}
+
+// ReceiveByLookupIDOption represents an option to receive messages by lookup
+// ID in a queue.
+type ReceiveByLookupIDOption struct {
+	set func(o *receiveByLookupIDOptions)
+}
+
+// receiveByLookupIDOptions contains all the options to receive messages by
+// lookup ID in a queue.
+type receiveByLookupIDOptions struct {
+	level                TransactionLevel
+	wantDestinationQueue bool
+	wantBody             bool
+	wantConnectorType    bool
+}
+
+// ReceiveByLookupIDWithTransaction returns a ReceiveOption that configures
+// receiving messages by lookup ID from a queue with the specified level value.
+//
+// The default is MTS.
+func ReceiveByLookupIDWithTransaction(level TransactionLevel) ReceiveByLookupIDOption {
+	return ReceiveByLookupIDOption{
+		set: func(o *receiveByLookupIDOptions) {
+			o.level = level
+		},
+	}
+}
+
+// ReceiveByLookupIDWithWantDestinationQueue returns a ReceiveByLookupIDOption
+// that configures receiving a message by lookup ID with the specified want
+// value.
+//
+// The default is false. If set to true, the Message.DestinationQueueInfo
+// property is updated when the message is read from the queue. Setting this
+// option to true may slow down the operation.
+func ReceiveByLookupIDWithWantDestinationQueue(want bool) ReceiveByLookupIDOption {
+	return ReceiveByLookupIDOption{
+		set: func(o *receiveByLookupIDOptions) {
+			o.wantDestinationQueue = want
+		},
+	}
+}
+
+// ReceiveByLookupIDWithWantBody returns a ReceiveByLookupIDOption that configures
+// receiving messages by lookup ID with the specified want value.
+//
+// The default is true. It specifies that the body of the message should be
+// retrieved. If the message body is not needed, set this option to false to
+// optimize the speed of the application.
+func ReceiveByLookupIDWithWantBody(want bool) ReceiveByLookupIDOption {
+	return ReceiveByLookupIDOption{
+		set: func(opts *receiveByLookupIDOptions) {
+			opts.wantBody = want
+		},
+	}
+}
+
+// ReceiveByLookupIDWithWantConnectorType returns a ReceiveByLookupIDOption that
+// configures receiving messages by lookup ID with the specified want value.
+//
+// The default is false. It specifies that MSMQ does not retrieve the
+// Message.ConnectorTypeGuid property when it receives a message in the
+// queue.
+func ReceiveByLookupIDWithWantConnectorType(want bool) ReceiveByLookupIDOption {
+	return ReceiveByLookupIDOption{
+		set: func(opts *receiveByLookupIDOptions) {
+			opts.wantConnectorType = want
+		},
+	}
+}
+
 func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, error) {
 	open, err := q.IsOpen()
 	if err != nil {
@@ -481,6 +566,22 @@ func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, err
 		}
 
 		return q.dispatch.CallMethod(action, int(options.level), options.wantDestinationQueue, options.wantBody, options.timeout, options.wantConnectorType)
+
+	case "ReceiveByLookupID", "ReceiveFirstByLookupID", "ReceiveLastByLookupID", "ReceiveNextByLookupID", "ReceivePreviousByLookupID":
+		id := params[0].(uint64)
+		options := &receiveByLookupIDOptions{
+			level:                MTS,
+			wantDestinationQueue: false,
+			wantBody:             true,
+			wantConnectorType:    false,
+		}
+
+		for _, o := range params[1].([]ReceiveByLookupIDOption) {
+			o.set(options)
+		}
+
+		return q.dispatch.CallMethod(action, id, int(options.level), options.wantDestinationQueue, options.wantBody, options.wantConnectorType)
+
 	default:
 		return nil, nil
 	}
