@@ -9,7 +9,7 @@ import (
 	"github.com/go-ole/go-ole"
 )
 
-// Queue represents an open instance of a queue that is represented by
+// Queue represents an instance of a queue that is represented by
 // QueueInfo. It provides the methods needed read and delete the
 // messages in the queue and the properties needed to manage the open
 // queue.
@@ -290,7 +290,7 @@ func (q *Queue) peek(action string, params ...interface{}) (*ole.VARIANT, error)
 	case "Peek", "PeekCurrent", "PeekNext":
 		options := &peekOptions{
 			wantDestinationQueue: false,
-			wantBody:             false,
+			wantBody:             true,
 			timeout:              1<<31 - 1,
 			wantConnectorType:    false,
 		}
