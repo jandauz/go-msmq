@@ -267,6 +267,7 @@ func (qi *QueueInfo) Open(accessMode AccessMode, shareMode ShareMode) (*Queue, e
 
 	return &Queue{
 		dispatch: queue.ToIDispatch(),
+		qi:       qi,
 	}, nil
 }
 

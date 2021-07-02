@@ -14,6 +14,7 @@ import (
 // messages in the queue and the properties needed to manage the open
 // queue.
 type Queue struct {
+	qi       *QueueInfo
 	dispatch *ole.IDispatch
 }
 
@@ -690,6 +691,27 @@ func (q *Queue) Reset() error {
 	return nil
 }
 
+// Access returns the access mode in which the queue was opened.
+func (q *Queue) Access() (AccessMode, error) {
+	res, err := q.dispatch.GetProperty("Access")
+	if err != nil {
+		return AccessMode(0), fmt.Errorf("go-msmq: Access() failed to get Access: %w", err)
+	}
+
+	return AccessMode(res.Value().(int32)), nil
+}
+
+// Handle returns the handle of the opened queue.
+func (q *Queue) Handle() (int32, error) {
+	res, err := q.dispatch.GetProperty("Handle")
+	if err != nil {
+		return 0, fmt.Errorf("go-msmq: Handle() failed to get Handle: %w", err)
+	}
+
+	return res.Value().(int32), err
+}
+
+// IsOpen returns whether the queue is open.
 func (q *Queue) IsOpen() (bool, error) {
 	res, err := q.dispatch.GetProperty("IsOpen2")
 	if err != nil {
@@ -697,4 +719,25 @@ func (q *Queue) IsOpen() (bool, error) {
 	}
 
 	return res.Value().(bool), err
+}
+
+// QueueInfo returns the QueueInfo that was used to open the queue.
+func (q *Queue) QueueInfo() (*QueueInfo, error) {
+	res, err := q.dispatch.GetProperty("QueueInfo")
+	if err != nil {
+		return nil, fmt.Errorf("go-msmq: QueueInfo() failed to get QueueInfo: %w", err)
+	}
+
+	q.qi.dispatch = res.ToIDispatch()
+	return q.qi, err
+}
+
+// ShareMode returns the share mode in which the queue was opened.
+func (q *Queue) ShareMode() (ShareMode, error) {
+	res, err := q.dispatch.GetProperty("ShareMode")
+	if err != nil {
+		return ShareMode(0), fmt.Errorf("go-msmq: ShareMode() failed to get ShareMode: %w", err)
+	}
+
+	return ShareMode(res.Value().(int32)), nil
 }
