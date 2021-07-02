@@ -558,6 +558,21 @@ func (q *Queue) ReceiveCurrent(opts ...ReceiveOption) (Message, error) {
 	}, nil
 }
 
+// ReceiveFirstByLookupID returns the first message in the queue and removes
+// the message from the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms701869(v=vs.85)
+func (q *Queue) ReceiveFirstByLookupID(opts ...ReceiveByLookupIDOption) (Message, error) {
+	msg, err := q.receive("ReceiveFirstByLookupID", opts)
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: ReceiveFirstByLookupID() failed to receive first message by lookup id: %w", err)
+	}
+
+	return Message{
+		dispatch: msg.ToIDispatch(),
+	}, nil
+}
+
 func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, error) {
 	open, err := q.IsOpen()
 	if err != nil {
@@ -584,7 +599,7 @@ func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, err
 
 		return q.dispatch.CallMethod(action, int(options.level), options.wantDestinationQueue, options.wantBody, options.timeout, options.wantConnectorType)
 
-	case "ReceiveByLookupID", "ReceiveFirstByLookupID", "ReceiveLastByLookupID", "ReceiveNextByLookupID", "ReceivePreviousByLookupID":
+	case "ReceiveByLookupID", "ReceiveNextByLookupID", "ReceivePreviousByLookupID":
 		id := params[0].(uint64)
 		options := &receiveByLookupIDOptions{
 			level:                MTS,
@@ -598,6 +613,20 @@ func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, err
 		}
 
 		return q.dispatch.CallMethod(action, id, int(options.level), options.wantDestinationQueue, options.wantBody, options.wantConnectorType)
+
+	case "ReceiveFirstByLookupID", "ReceiveLastByLookupID":
+		options := &receiveByLookupIDOptions{
+			level:                MTS,
+			wantDestinationQueue: false,
+			wantBody:             true,
+			wantConnectorType:    false,
+		}
+
+		for _, o := range params[0].([]ReceiveByLookupIDOption) {
+			o.set(options)
+		}
+
+		return q.dispatch.CallMethod(action, int(options.level), options.wantDestinationQueue, options.wantBody, options.wantConnectorType)
 
 	default:
 		return nil, nil
