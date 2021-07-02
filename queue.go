@@ -678,6 +678,18 @@ func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, err
 	}
 }
 
+// Reset resets the postion of the cursor to the start of the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706246(v=vs.85)
+func (q *Queue) Reset() error {
+	_, err := q.dispatch.CallMethod("Reset")
+	if err != nil {
+		return fmt.Errorf("go-msmq: Reset() failed to reset the position of the cursor: %w", err)
+	}
+
+	return nil
+}
+
 func (q *Queue) IsOpen() (bool, error) {
 	res, err := q.dispatch.GetProperty("IsOpen2")
 	if err != nil {
