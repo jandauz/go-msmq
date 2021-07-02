@@ -588,6 +588,21 @@ func (q *Queue) ReceiveLastByLookupID(opts ...ReceiveByLookupIDOption) (Message,
 	}, nil
 }
 
+// ReceiveNextByLookupID returns the message that follows the message referenced
+// by id and removes the message from the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms704392(v=vs.85)
+func (q *Queue) ReceiveNextByLookupID(id uint64, opts ...ReceiveByLookupIDOption) (Message, error) {
+	msg, err := q.receive("ReceiveNextByLookupID", id, opts)
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: ReceiveNextByLookupID(%d) failed to receive next message by lookup id: %w", id, err)
+	}
+
+	return Message{
+		dispatch: msg.ToIDispatch(),
+	}, nil
+}
+
 func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, error) {
 	open, err := q.IsOpen()
 	if err != nil {
