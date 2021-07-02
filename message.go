@@ -106,3 +106,13 @@ func (m *Message) SetBody(s string) error {
 
 	return nil
 }
+
+// LookupID returns the lookup identifier of the message.
+func (m *Message) LookupID() (string, error) {
+	res, err := m.dispatch.GetProperty("LookupId")
+	if err != nil {
+		return "", fmt.Errorf("go-msmq: LookupID() failed to get LookupId: %w", err)
+	}
+
+	return res.Value().(string), nil
+}
