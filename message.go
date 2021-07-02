@@ -70,6 +70,13 @@ func SendWithTransaction(level TransactionLevel) SendOption {
 }
 
 func (m *Message) Body() (string, error) {
+	// Assert that the message is not empty. This can happen in scenarios
+	// like a Queue.Peek() timing out which returns a "Nothing" object
+	// which is equivalent to an empty Message struct.
+	if (Message{}) == *m {
+		return "", nil
+	}
+
 	res, err := m.dispatch.GetProperty("Body")
 	if err != nil {
 		return "", err
