@@ -1,6 +1,8 @@
 package msmq
 
 import (
+	"fmt"
+
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 )
@@ -20,18 +22,51 @@ func NewMessage() (Message, error) {
 		return Message{}, err
 	}
 
-	return Message{
+	msg := Message{
 		dispatch: dispatch,
-	}, nil
+	}
+
+	return msg, nil
 }
 
-func (m *Message) Send(queue *Queue) error {
-	_, err := m.dispatch.CallMethod("Send", queue.dispatch)
+// Send sends a message to the queue. An option can be specified to indicate
+// whether the message is sent as a transaction.
+func (m *Message) Send(queue *Queue, opts ...SendOption) error {
+	options := &sendOptions{
+		level: MTS,
+	}
+	for _, o := range opts {
+		o.set(options)
+	}
+
+	_, err := m.dispatch.CallMethod("Send", queue.dispatch, int(options.level))
 	if err != nil {
-		return err
+		return fmt.Errorf("go-msmq: Send() failed to send message: %w", err)
 	}
 
 	return nil
+}
+
+// SendOption represents an option to send messages to a queue.
+type SendOption struct {
+	set func(o *sendOptions)
+}
+
+// sendOptions contains all the options to send messages to a queue.
+type sendOptions struct {
+	level TransactionLevel
+}
+
+// SendWithTransaction returns a SendOption that configures sending messages
+// to a queue with the specified level value.
+//
+// The default is MTS.
+func SendWithTransaction(level TransactionLevel) SendOption {
+	return SendOption{
+		set: func(o *sendOptions) {
+			o.level = level
+		},
+	}
 }
 
 func (m *Message) Body() (string, error) {
