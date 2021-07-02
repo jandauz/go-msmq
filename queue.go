@@ -261,7 +261,7 @@ func (q *Queue) PeekNextByLookupID(id uint64, opts ...PeekByLookupIDOption) (Mes
 	}, nil
 }
 
-// PeekPreviousByLookupID returns the message that follows the message referenced
+// PeekPreviousByLookupID returns the message that precedes the message referenced
 // by id but does not remove the message from the queue.
 //
 // See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706024(v=vs.85)
@@ -596,6 +596,21 @@ func (q *Queue) ReceiveNextByLookupID(id uint64, opts ...ReceiveByLookupIDOption
 	msg, err := q.receive("ReceiveNextByLookupID", id, opts)
 	if err != nil {
 		return Message{}, fmt.Errorf("go-msmq: ReceiveNextByLookupID(%d) failed to receive next message by lookup id: %w", id, err)
+	}
+
+	return Message{
+		dispatch: msg.ToIDispatch(),
+	}, nil
+}
+
+// ReceivePreviousByLookupID returns the message that precedes the message referenced
+// by id and removes the message from the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms707123(v=vs.85)
+func (q *Queue) ReceivePreviousByLookupID(id uint64, opts ...ReceiveByLookupIDOption) (Message, error) {
+	msg, err := q.receive("ReceivePreviousByLookupID", id, opts)
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: ReceivePreviousByLookupID(%d) failed to receive previous message by lookup id: %w", id, err)
 	}
 
 	return Message{
