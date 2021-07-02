@@ -573,6 +573,21 @@ func (q *Queue) ReceiveFirstByLookupID(opts ...ReceiveByLookupIDOption) (Message
 	}, nil
 }
 
+// ReceiveLastByLookupID returns the last message in the queue and removes
+// the message from the queue.
+//
+// See: https://docs.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ms706134(v=vs.85)
+func (q *Queue) ReceiveLastByLookupID(opts ...ReceiveByLookupIDOption) (Message, error) {
+	msg, err := q.receive("ReceiveLastByLookupID", opts)
+	if err != nil {
+		return Message{}, fmt.Errorf("go-msmq: ReceiveLastByLookupID() failed to receive last message by lookup id: %w", err)
+	}
+
+	return Message{
+		dispatch: msg.ToIDispatch(),
+	}, nil
+}
+
 func (q *Queue) receive(action string, params ...interface{}) (*ole.VARIANT, error) {
 	open, err := q.IsOpen()
 	if err != nil {
